@@ -5,8 +5,9 @@
  * Reads input events from the EMKM control registers at $FFFE9000
  * and reports them to the Linux input subsystem.
  *
- * The emulator host pushes keyboard and mouse events into an MMIO FIFO.
- * This driver polls the FIFO at 100 Hz and reports events via evdev.
+ * Keyboard and mouse button events are read from the MMIO event FIFO.
+ * Mouse position is polled from the MOUSE_ABS_X/Y registers, providing
+ * absolute coordinates that map directly to the emulator's framebuffer.
  *
  * Copyright (C) 2026 hha0x617
  */
@@ -20,22 +21,20 @@
 #define EMKM_MAGIC   0x454D4B4D  /* "EMKM" */
 
 /* Register offsets */
-#define REG_MAGIC       0x00  /* R   u32: magic number */
-#define REG_EVENT_COUNT 0x04  /* R   u8:  pending event count */
-#define REG_EVENT_TYPE  0x05  /* R   u8:  front event type */
-#define REG_EVENT_CODE  0x06  /* R   u16: scancode / button code */
-#define REG_EVENT_VALUE 0x08  /* R   s16: key value / delta-X */
-#define REG_EVENT_VALUE2 0x0A /* R   s16: delta-Y / button state */
-#define REG_EVENT_ACK   0x0C  /* W   u8:  dequeue front event */
-#define REG_MOUSE_ABS_X 0x14  /* R   u16: absolute mouse X */
-#define REG_MOUSE_ABS_Y 0x16  /* R   u16: absolute mouse Y */
-#define REG_MOUSE_MODE  0x18  /* RW  u8:  0=relative, 1=absolute */
-#define REG_SCREEN_W    0x1C  /* R   u16: screen width */
-#define REG_SCREEN_H    0x1E  /* R   u16: screen height */
+#define REG_MAGIC       0x00
+#define REG_EVENT_COUNT 0x04
+#define REG_EVENT_TYPE  0x05
+#define REG_EVENT_CODE  0x06
+#define REG_EVENT_VALUE 0x08
+#define REG_EVENT_VALUE2 0x0A
+#define REG_EVENT_ACK   0x0C
+#define REG_MOUSE_ABS_X 0x14
+#define REG_MOUSE_ABS_Y 0x16
+#define REG_SCREEN_W    0x1C
+#define REG_SCREEN_H    0x1E
 
-/* Event types (must match emulator's InputDevice) */
+/* Event types */
 #define EVENT_KEY        1
-#define EVENT_MOUSE_MOVE 2
 #define EVENT_MOUSE_BTN  3
 
 /* Poll interval: 10ms = 100 Hz */
@@ -46,23 +45,22 @@ static struct input_dev *kbd_dev;
 static struct input_dev *mouse_dev;
 static struct timer_list poll_timer;
 static u16 screen_w, screen_h;
+static u16 last_abs_x, last_abs_y;
 
 static void em68030input_poll(struct timer_list *t)
 {
 	int count, i;
 	u8 type;
-	u16 code;
-	s16 value, value2;
+	u16 code, abs_x, abs_y;
+	s16 value;
 
+	/* Process keyboard and mouse button events from FIFO */
 	count = ioread8(regs + REG_EVENT_COUNT);
-
 	for (i = 0; i < count; i++) {
-		type   = ioread8(regs + REG_EVENT_TYPE);
-		code   = ioread16be(regs + REG_EVENT_CODE);
-		value  = (s16)ioread16be(regs + REG_EVENT_VALUE);
-		value2 = (s16)ioread16be(regs + REG_EVENT_VALUE2);
+		type = ioread8(regs + REG_EVENT_TYPE);
+		code = ioread16be(regs + REG_EVENT_CODE);
+		value = (s16)ioread16be(regs + REG_EVENT_VALUE);
 
-		/* Dequeue this event */
 		iowrite8(0, regs + REG_EVENT_ACK);
 
 		switch (type) {
@@ -71,24 +69,27 @@ static void em68030input_poll(struct timer_list *t)
 			input_sync(kbd_dev);
 			break;
 
-		case EVENT_MOUSE_MOVE:
-			if (ioread8(regs + REG_MOUSE_MODE)) {
-				/* Absolute mode: value=X, value2=Y */
-				input_report_abs(mouse_dev, ABS_X, (u16)value);
-				input_report_abs(mouse_dev, ABS_Y, (u16)value2);
-			} else {
-				/* Relative mode: value=dX, value2=dY */
-				input_report_rel(mouse_dev, REL_X, value);
-				input_report_rel(mouse_dev, REL_Y, value2);
-			}
-			input_sync(mouse_dev);
-			break;
-
 		case EVENT_MOUSE_BTN:
 			input_report_key(mouse_dev, code, value);
 			input_sync(mouse_dev);
 			break;
+
+		default:
+			/* Skip mouse move events in FIFO — position is read from registers */
+			break;
 		}
+	}
+
+	/* Read absolute mouse position from registers */
+	abs_x = ioread16be(regs + REG_MOUSE_ABS_X);
+	abs_y = ioread16be(regs + REG_MOUSE_ABS_Y);
+
+	if (abs_x != last_abs_x || abs_y != last_abs_y) {
+		input_report_abs(mouse_dev, ABS_X, abs_x);
+		input_report_abs(mouse_dev, ABS_Y, abs_y);
+		input_sync(mouse_dev);
+		last_abs_x = abs_x;
+		last_abs_y = abs_y;
 	}
 
 	mod_timer(&poll_timer, jiffies + msecs_to_jiffies(POLL_INTERVAL_MS));
@@ -97,13 +98,8 @@ static void em68030input_poll(struct timer_list *t)
 static int __init em68030input_init(void)
 {
 	u32 magic;
-	int err;
-	int i;
+	int err, i;
 
-	/*
-	 * On m68k, I/O addresses above 0xFF000000 are identity-mapped.
-	 * Use a direct pointer cast to avoid iounmap "bad pmd" warnings.
-	 */
 	regs = (volatile void __iomem *)EMKM_BASE;
 
 	magic = ioread32be(regs + REG_MAGIC);
@@ -130,8 +126,10 @@ static int __init em68030input_init(void)
 
 	set_bit(EV_KEY, kbd_dev->evbit);
 	set_bit(EV_REP, kbd_dev->evbit);
-	/* Enable all standard keys (KEY_ESC=1 through KEY_MAX) */
-	for (i = 1; i < KEY_MAX; i++)
+	/* Enable standard keyboard keys only (KEY_ESC=1 through KEY_UNKNOWN=240).
+	 * Registering up to KEY_MAX includes BTN_* codes (0x100+), which causes
+	 * udev/libinput to misclassify the keyboard as a mouse device. */
+	for (i = 1; i <= 240; i++)
 		set_bit(i, kbd_dev->keybit);
 
 	err = input_register_device(kbd_dev);
@@ -141,7 +139,7 @@ static int __init em68030input_init(void)
 		return err;
 	}
 
-	/* --- Mouse/tablet input device --- */
+	/* --- Mouse/tablet input device (absolute coordinates) --- */
 	mouse_dev = input_allocate_device();
 	if (!mouse_dev) {
 		input_unregister_device(kbd_dev);
@@ -157,20 +155,15 @@ static int __init em68030input_init(void)
 
 	set_bit(EV_KEY, mouse_dev->evbit);
 	set_bit(EV_ABS, mouse_dev->evbit);
-	set_bit(EV_REL, mouse_dev->evbit);
 
 	/* Mouse buttons */
 	set_bit(BTN_LEFT,   mouse_dev->keybit);
 	set_bit(BTN_RIGHT,  mouse_dev->keybit);
 	set_bit(BTN_MIDDLE, mouse_dev->keybit);
 
-	/* Absolute axes (tablet mode, default) */
+	/* Absolute axes — coordinates map directly to framebuffer pixels */
 	input_set_abs_params(mouse_dev, ABS_X, 0, screen_w - 1, 0, 0);
 	input_set_abs_params(mouse_dev, ABS_Y, 0, screen_h - 1, 0, 0);
-
-	/* Relative axes (for optional relative mode) */
-	set_bit(REL_X, mouse_dev->relbit);
-	set_bit(REL_Y, mouse_dev->relbit);
 
 	err = input_register_device(mouse_dev);
 	if (err) {
