@@ -23,40 +23,29 @@ hardcoded values.
 - Kernel built with `CONFIG_FB_SIMPLE=y` (or `=m`)
 - Verify: `zcat /proc/config.gz | grep FB_SIMPLE`
 
-**Install build dependencies (on the guest):**
+**Cross-compile on the host:**
+
+Building kernel modules natively on the emulated m68k guest is impractical because
+the kernel build system requires host-architecture tools (in `scripts/`) that cannot
+run on the guest. Cross-compile the module on the host instead.
+
+On the **host** (cross-build environment), with the kernel source tree used to build
+the running kernel:
 ```bash
-apt install build-essential bc flex bison libelf-dev
-```
-
-**Set up kernel headers:**
-
-The module Makefile expects the kernel build tree at `/lib/modules/$(uname -r)/build`.
-Since the guest runs a custom-built kernel, you must prepare and install the headers
-from the same kernel source used to build the running kernel.
-
-On the **host** (cross-build environment), after building the kernel:
-```bash
-# In the kernel source directory
+# Ensure the kernel build tree is prepared (skip if you already built vmlinux)
+cd /path/to/linux-6.12.17
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- modules_prepare
 
-# Create a tarball of the kernel build tree
-KVER=$(make -s kernelrelease)
-tar cf /tmp/kheaders.tar \
-  --transform "s,^,/usr/src/linux-headers-${KVER}/," \
-  .config Module.symvers Makefile include/ scripts/ arch/m68k/include/ arch/m68k/Makefile
+# Cross-compile the module
+cd /path/to/em68030-guest-linux/drivers/em68030fb
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-6.12.17 M=$(pwd) modules
 ```
 
-Copy the tarball to the guest disk image and extract it on the guest:
-```bash
-tar xf /path/to/kheaders.tar -C /
-ln -s /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build
-```
+Copy the resulting `em68030fb.ko` to the guest disk image.
 
-**Build and load:**
+**Load on the guest:**
 ```bash
-cd drivers/em68030fb
-make
-insmod em68030fb.ko
+insmod /path/to/em68030fb.ko
 ```
 
 **Verify:**
@@ -66,8 +55,18 @@ cat /dev/urandom > /dev/fb0   # noise should appear in emulator's framebuffer wi
 ```
 
 **Install for auto-load:**
+
+On the host, cross-compile the install target:
 ```bash
-make install
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-6.12.17 M=$(pwd) \
+  INSTALL_MOD_PATH=/path/to/guest-rootfs modules_install
+```
+
+Or manually on the guest:
+```bash
+mkdir -p /lib/modules/$(uname -r)/extra
+cp em68030fb.ko /lib/modules/$(uname -r)/extra/
+depmod -a
 echo em68030fb >> /etc/modules
 ```
 
