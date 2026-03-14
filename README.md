@@ -89,6 +89,56 @@ echo em68030fb > /etc/modules-load.d/em68030fb.conf
 # Add modules="em68030fb" to /etc/conf.d/modules
 ```
 
+### drivers/em68030input/
+
+Loadable kernel module that provides virtual keyboard and mouse input devices
+by reading events from the EMKM control registers at `$FFFE9000`.
+
+The emulator host captures keyboard and mouse events in the framebuffer window
+and pushes them into an MMIO event FIFO. This driver polls the FIFO at 100 Hz
+and reports events via the Linux input subsystem (`evdev`).
+
+Supports both absolute mouse mode (tablet-style, for framebuffer use) and
+relative mouse mode. Keyboard events use Linux `KEY_*` codes directly.
+
+**Prerequisites:**
+- Kernel built with `CONFIG_INPUT=y` and `CONFIG_INPUT_EVDEV=y` (or `=m`)
+- Kernel built with `CONFIG_TRIM_UNUSED_KSYMS` disabled
+- Framebuffer enabled in emulator settings (EMKM device is only present when
+  framebuffer is active)
+
+**Cross-compile on the host:**
+```bash
+cd /path/to/em68030-guest-linux/drivers/em68030input
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-6.12.17 M=$(pwd) modules
+```
+
+Copy the resulting `em68030input.ko` to the guest disk image.
+
+**Load on the guest:**
+```bash
+insmod /path/to/em68030input.ko
+```
+
+**Verify:**
+```bash
+# Should show "Em68030 Virtual Keyboard" and "Em68030 Virtual Mouse"
+cat /proc/bus/input/devices
+```
+
+**Install for auto-load:**
+```bash
+mkdir -p /lib/modules/$(uname -r)/extra
+cp em68030input.ko /lib/modules/$(uname -r)/extra/
+depmod -a
+
+# systemd (Debian, Gentoo with systemd):
+echo em68030input > /etc/modules-load.d/em68030input.conf
+
+# OpenRC (Gentoo with OpenRC):
+# Add modules="em68030fb em68030input" to /etc/conf.d/modules
+```
+
 ### patches/
 
 Kernel source patches for Em68030-specific MVME147 support.
