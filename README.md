@@ -21,6 +21,9 @@ hardcoded values.
 
 **Prerequisites:**
 - Kernel built with `CONFIG_FB_SIMPLE=y` (or `=m`)
+- Kernel built with `CONFIG_TRIM_UNUSED_KSYMS` disabled — this option strips
+  unexported symbols (`ioremap`, `platform_device_register`, etc.) from the
+  running kernel, causing `insmod` to fail with "Unknown symbol in module"
 - Verify: `zcat /proc/config.gz | grep FB_SIMPLE`
 
 **Cross-compile on the host:**
@@ -30,11 +33,15 @@ the kernel build system requires host-architecture tools (in `scripts/`) that ca
 run on the guest. Cross-compile the module on the host instead.
 
 On the **host** (cross-build environment), with the kernel source tree used to build
-the running kernel:
+the running kernel. The kernel must have been fully built (`vmlinux`) first.
 ```bash
-# Ensure the kernel build tree is prepared (skip if you already built vmlinux)
+# Build the kernel first (skip if you already have vmlinux)
 cd /path/to/linux-6.12.17
-make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- modules_prepare
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
+
+# Kernel 6.12+ writes exported symbols to vmlinux.symvers, but out-of-tree
+# module builds read Module.symvers. Copy if Module.symvers is stale/empty.
+cp vmlinux.symvers Module.symvers
 
 # Cross-compile the module
 cd /path/to/em68030-guest-linux/drivers/em68030fb
@@ -66,6 +73,11 @@ Or manually on the guest:
 ```bash
 mkdir -p /lib/modules/$(uname -r)/extra
 cp em68030fb.ko /lib/modules/$(uname -r)/extra/
+
+# Create metadata files if missing (not installed by "make vmlinux" alone)
+cd /lib/modules/$(uname -r)
+touch modules.order modules.builtin modules.builtin.modinfo
+
 depmod -a
 echo em68030fb >> /etc/modules
 ```
