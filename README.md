@@ -1,13 +1,15 @@
 # em68030-guest-linux
 
 Guest-side Linux kernel modules, patches, and configurations for the
-[Em68030](https://github.com/hha0x617/em68030) MC68030/MVME147 emulator.
+[Em68030](https://github.com/hha0x617/Em68030_WinUI3Cpp) MC68030/MVME147 emulator.
 
 ## License
 
 This repository is licensed under GPL-2.0-only. See [LICENSE](LICENSE) for details.
 
-The emulator itself (Em68030) is licensed under Apache License 2.0 in separate repositories.
+The emulator itself is licensed under Apache License 2.0 in separate repositories
+([Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp),
+[Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF)).
 
 ## Contents
 
@@ -79,7 +81,12 @@ cd /lib/modules/$(uname -r)
 touch modules.order modules.builtin modules.builtin.modinfo
 
 depmod -a
-echo em68030fb >> /etc/modules
+
+# systemd (Debian, Gentoo with systemd):
+echo em68030fb > /etc/modules-load.d/em68030fb.conf
+
+# OpenRC (Gentoo with OpenRC):
+# Add modules="em68030fb" to /etc/conf.d/modules
 ```
 
 ### patches/

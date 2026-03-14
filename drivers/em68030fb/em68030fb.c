@@ -29,18 +29,21 @@ static struct platform_device em68030fb_dev = {
 
 static int __init em68030fb_init(void)
 {
-	void __iomem *regs;
+	volatile void __iomem *regs;
 	u32 magic, vbase, vsize;
 	u16 width, height, stride;
 	u8 bpp;
 
-	regs = ioremap(EMFB_BASE, 64);
-	if (!regs)
-		return -ENOMEM;
+	/*
+	 * On m68k, I/O addresses above 0xFF000000 are identity-mapped and
+	 * directly accessible.  Using ioremap()/iounmap() on these addresses
+	 * triggers "iounmap: bad pmd" warnings because no page table entries
+	 * were actually created.  Use a direct pointer cast instead.
+	 */
+	regs = (volatile void __iomem *)EMFB_BASE;
 
 	magic = ioread32be(regs + 0x00);
 	if (magic != EMFB_MAGIC) {
-		iounmap(regs);
 		pr_err("em68030fb: EMFB device not found (magic=0x%08x)\n",
 		       magic);
 		return -ENODEV;
@@ -52,7 +55,6 @@ static int __init em68030fb_init(void)
 	stride = ioread16be(regs + 0x0A);
 	vbase  = ioread32be(regs + 0x0C);
 	vsize  = ioread32be(regs + 0x10);
-	iounmap(regs);
 
 	em68030fb_pdata.width  = width;
 	em68030fb_pdata.height = height;
