@@ -177,6 +177,7 @@ tree as `.config` instead of running `menuconfig` manually.
 |------|-------------|
 | `.config.20260308_BASIC_CONFIG` | Minimal config: UART + network (`CONFIG_MVME147_NET=y`), no framebuffer |
 | `.config.20260312_FB_SIMPLE` | Full config: UART + framebuffer + network |
+| `.config.20260314_FB_CONSOLE_with_INPUT_EVDEV` | Full config + fbcon + evdev input (for keyboard/mouse) |
 
 **Key options enabled (common to all configs):**
 - `CONFIG_M68030=y`, `CONFIG_MVME147=y` — CPU and board support
