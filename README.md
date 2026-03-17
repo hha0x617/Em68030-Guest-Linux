@@ -98,8 +98,10 @@ The emulator host captures keyboard and mouse events in the framebuffer window
 and pushes them into an MMIO event FIFO. This driver polls the FIFO at 100 Hz
 and reports events via the Linux input subsystem (`evdev`).
 
-Supports both absolute mouse mode (tablet-style, for framebuffer use) and
-relative mouse mode. Keyboard events use Linux `KEY_*` codes directly.
+Registers three input devices:
+- **Keyboard** (`/dev/input/event0`): Linux `KEY_*` codes
+- **Tablet** (`/dev/input/event1`): Absolute coordinates for X Window System / libinput
+- **Mouse** (`/dev/input/event2`): Relative coordinates computed from absolute position deltas, for gpm (fbcon text selection)
 
 **Prerequisites:**
 - Kernel built with `CONFIG_INPUT=y` and `CONFIG_INPUT_EVDEV=y` (or `=m`)
