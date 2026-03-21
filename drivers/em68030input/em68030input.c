@@ -37,6 +37,7 @@
 
 /* Event types */
 #define EVENT_KEY        1
+#define EVENT_MOUSE_MOVE 2
 #define EVENT_MOUSE_BTN  3
 
 /* Poll interval: 10ms = 100 Hz */
@@ -55,14 +56,15 @@ static void em68030input_poll(struct timer_list *t)
 	int count, i;
 	u8 type;
 	u16 code, abs_x, abs_y;
-	s16 value;
+	s16 value, value2;
 
-	/* Process keyboard and mouse button events from FIFO */
+	/* Process all events from FIFO */
 	count = ioread8(regs + REG_EVENT_COUNT);
 	for (i = 0; i < count; i++) {
 		type = ioread8(regs + REG_EVENT_TYPE);
 		code = ioread16be(regs + REG_EVENT_CODE);
 		value = (s16)ioread16be(regs + REG_EVENT_VALUE);
+		value2 = (s16)ioread16be(regs + REG_EVENT_VALUE2);
 
 		iowrite8(0, regs + REG_EVENT_ACK);
 
@@ -70,6 +72,15 @@ static void em68030input_poll(struct timer_list *t)
 		case EVENT_KEY:
 			input_report_key(kbd_dev, code, value);
 			input_sync(kbd_dev);
+			break;
+
+		case EVENT_MOUSE_MOVE:
+			/* Relative deltas from emulator (value=dx, value2=dy).
+			 * Only fires when pointer moves inside the framebuffer
+			 * window, so no window re-entry jumps. */
+			input_report_rel(mouse_dev, REL_X, value);
+			input_report_rel(mouse_dev, REL_Y, value2);
+			input_sync(mouse_dev);
 			break;
 
 		case EVENT_MOUSE_BTN:
@@ -85,21 +96,14 @@ static void em68030input_poll(struct timer_list *t)
 		}
 	}
 
-	/* Read absolute mouse position from registers */
+	/* Read absolute mouse position from registers (tablet device) */
 	abs_x = ioread16be(regs + REG_MOUSE_ABS_X);
 	abs_y = ioread16be(regs + REG_MOUSE_ABS_Y);
 
 	if (abs_x != last_abs_x || abs_y != last_abs_y) {
-		/* Absolute device: report position directly */
 		input_report_abs(tablet_dev, ABS_X, abs_x);
 		input_report_abs(tablet_dev, ABS_Y, abs_y);
 		input_sync(tablet_dev);
-
-		/* Relative device: compute delta from previous position */
-		input_report_rel(mouse_dev, REL_X, (s16)(abs_x - last_abs_x));
-		input_report_rel(mouse_dev, REL_Y, (s16)(abs_y - last_abs_y));
-		input_sync(mouse_dev);
-
 		last_abs_x = abs_x;
 		last_abs_y = abs_y;
 	}
