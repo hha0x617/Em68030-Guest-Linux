@@ -89,3 +89,37 @@ jobs:
         with:
           name: em68030-guest-linux
           path: artifacts/
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          TAG="${{ github.ref_name }}"
+          SUFFIX="${{ env.KERNEL_VERSION }}-mvme147-uart16550-${{ env.CONFIG_NAME }}-${SHORT_HASH}"
+          gh release create "$TAG" artifacts/* --title "$TAG" --notes "$(cat <<EOF
+          ## Em68030 Guest Linux ${TAG}
+
+          Pre-built Linux ${{ env.KERNEL_VERSION }} kernel and modules for the Em68030 emulator.
+
+          ### Assets
+          - **vmlinux-${SUFFIX}** — Kernel image (load via File → Open ELF)
+          - **em68030fb-${SHORT_HASH}.ko** — Framebuffer driver module
+          - **em68030input-${SHORT_HASH}.ko** — Virtual keyboard/mouse driver module
+
+          ### Note
+          Rename \`.ko\` files to their original names before installing on the guest:
+          \`\`\`bash
+          mv em68030fb-*.ko em68030fb.ko
+          mv em68030input-*.ko em68030input.ko
+          \`\`\`
+
+          ### Source Code (GPL-2.0)
+          The kernel image is built from Linux ${{ env.KERNEL_VERSION }} with patches and configuration from this repository:
+          - **Kernel source**: https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
+          - **Patches**: [patches/](https://github.com/${{ github.repository }}/tree/${TAG}/patches)
+          - **Config**: [${{ env.CONFIG_FILE }}](https://github.com/${{ github.repository }}/blob/${TAG}/${{ env.CONFIG_FILE }})
+          - **Build workflow**: [.github/workflows/build.yml](https://github.com/${{ github.repository }}/blob/${TAG}/.github/workflows/build.yml)
+          EOF
+          )"
