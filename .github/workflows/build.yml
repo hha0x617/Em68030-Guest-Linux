@@ -1,4 +1,4 @@
-name: Build Kernel Modules
+name: Build Kernel and Modules
 
 on:
   push:
@@ -10,6 +10,8 @@ on:
 
 env:
   KERNEL_VERSION: "6.12.17"
+  CONFIG_NAME: "fbconsole+evdev"
+  CONFIG_FILE: "configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV"
 
 jobs:
   build:
@@ -21,26 +23,38 @@ jobs:
       - name: Install m68k cross-compiler
         run: sudo apt-get update && sudo apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu make bc flex bison libelf-dev libssl-dev
 
-      - name: Cache kernel build
+      - name: Cache kernel source
+        id: cache-kernel
         uses: actions/cache@v4
         with:
           path: ~/linux-${{ env.KERNEL_VERSION }}
-          key: kernel-${{ env.KERNEL_VERSION }}-m68k-${{ hashFiles('configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV') }}
+          key: kernel-src-${{ env.KERNEL_VERSION }}
 
-      - name: Download and build kernel
+      - name: Download kernel source
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
-          if [ -f ~/linux-${{ env.KERNEL_VERSION }}/vmlinux ]; then
-            echo "Using cached kernel build"
-          else
-            cd ~
-            curl -sL https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz | tar xJ
-            cd linux-${{ env.KERNEL_VERSION }}
-            cp $GITHUB_WORKSPACE/configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV .config
-            make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- olddefconfig
-            make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
-            make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- modules_prepare
-            cp vmlinux.symvers Module.symvers
-          fi
+          cd ~
+          curl -sL https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz | tar xJ
+
+      - name: Apply patches
+        run: |
+          cd ~/linux-${{ env.KERNEL_VERSION }}
+          git init -q 2>/dev/null || true
+          git add -A 2>/dev/null && git commit -q -m "baseline" --allow-empty 2>/dev/null || true
+          git checkout -q -- . 2>/dev/null || true
+          for patch in $GITHUB_WORKSPACE/patches/*.patch; do
+            echo "Applying $(basename $patch)..."
+            patch -p1 -N < "$patch" || true
+          done
+
+      - name: Build kernel
+        run: |
+          cd ~/linux-${{ env.KERNEL_VERSION }}
+          cp $GITHUB_WORKSPACE/${{ env.CONFIG_FILE }} .config
+          make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- olddefconfig
+          make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
+          make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- modules_prepare
+          cp vmlinux.symvers Module.symvers
 
       - name: Build em68030fb module
         run: |
@@ -54,16 +68,23 @@ jobs:
             -C ~/linux-${{ env.KERNEL_VERSION }} \
             M=$GITHUB_WORKSPACE/drivers/em68030input modules
 
-      - name: Verify modules
+      - name: Verify build outputs
         run: |
+          file ~/linux-${{ env.KERNEL_VERSION }}/vmlinux
           file drivers/em68030fb/em68030fb.ko
           file drivers/em68030input/em68030input.ko
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          SUFFIX="${{ env.KERNEL_VERSION }}-mvme147-uart16550-${{ env.CONFIG_NAME }}"
+          cp ~/linux-${{ env.KERNEL_VERSION }}/vmlinux "artifacts/vmlinux-${SUFFIX}"
+          cp drivers/em68030fb/em68030fb.ko artifacts/
+          cp drivers/em68030input/em68030input.ko artifacts/
 
       - name: Upload artifact
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-modules-${{ env.KERNEL_VERSION }}
-          path: |
-            drivers/em68030fb/em68030fb.ko
-            drivers/em68030input/em68030input.ko
+          name: em68030-guest-linux
+          path: artifacts/
