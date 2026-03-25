@@ -77,10 +77,11 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          SUFFIX="${{ env.KERNEL_VERSION }}-mvme147-uart16550-${{ env.CONFIG_NAME }}"
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          SUFFIX="${{ env.KERNEL_VERSION }}-mvme147-uart16550-${{ env.CONFIG_NAME }}-${SHORT_HASH}"
           cp ~/linux-${{ env.KERNEL_VERSION }}/vmlinux "artifacts/vmlinux-${SUFFIX}"
-          cp drivers/em68030fb/em68030fb.ko artifacts/
-          cp drivers/em68030input/em68030input.ko artifacts/
+          cp drivers/em68030fb/em68030fb.ko "artifacts/em68030fb-${SHORT_HASH}.ko"
+          cp drivers/em68030input/em68030input.ko "artifacts/em68030input-${SHORT_HASH}.ko"
 
       - name: Upload artifact
         if: startsWith(github.ref, 'refs/tags/v')

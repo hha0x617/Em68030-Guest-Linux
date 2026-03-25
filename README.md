@@ -11,6 +11,22 @@ The emulator itself is licensed under Apache License 2.0 in separate repositorie
 ([Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp),
 [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF)).
 
+## Pre-built Binaries
+
+Pre-built kernel image and modules are available on the
+[Releases](https://github.com/hha0x617/Em68030-Guest-Linux/releases) page.
+
+Release assets use suffixed filenames to identify the build (e.g.,
+`em68030fb-abc1234.ko`, `em68030input-abc1234.ko`).
+**Rename the `.ko` files to their original names before installing:**
+
+```bash
+mv em68030fb-*.ko em68030fb.ko
+mv em68030input-*.ko em68030input.ko
+```
+
+The `vmlinux` image can be loaded directly by the emulator (File → Open ELF).
+
 ## Contents
 
 ### drivers/em68030fb/
