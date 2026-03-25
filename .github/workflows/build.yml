@@ -1,0 +1,69 @@
+name: Build Kernel Modules
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  KERNEL_VERSION: "6.12.17"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install m68k cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu make bc flex bison libelf-dev libssl-dev
+
+      - name: Cache kernel build
+        uses: actions/cache@v4
+        with:
+          path: ~/linux-${{ env.KERNEL_VERSION }}
+          key: kernel-${{ env.KERNEL_VERSION }}-m68k-${{ hashFiles('configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV') }}
+
+      - name: Download and build kernel
+        run: |
+          if [ -f ~/linux-${{ env.KERNEL_VERSION }}/vmlinux ]; then
+            echo "Using cached kernel build"
+          else
+            cd ~
+            curl -sL https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz | tar xJ
+            cd linux-${{ env.KERNEL_VERSION }}
+            cp $GITHUB_WORKSPACE/configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV .config
+            make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- olddefconfig
+            make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
+            make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- modules_prepare
+            cp vmlinux.symvers Module.symvers
+          fi
+
+      - name: Build em68030fb module
+        run: |
+          make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- \
+            -C ~/linux-${{ env.KERNEL_VERSION }} \
+            M=$GITHUB_WORKSPACE/drivers/em68030fb modules
+
+      - name: Build em68030input module
+        run: |
+          make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- \
+            -C ~/linux-${{ env.KERNEL_VERSION }} \
+            M=$GITHUB_WORKSPACE/drivers/em68030input modules
+
+      - name: Verify modules
+        run: |
+          file drivers/em68030fb/em68030fb.ko
+          file drivers/em68030input/em68030input.ko
+
+      - name: Upload artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-modules-${{ env.KERNEL_VERSION }}
+          path: |
+            drivers/em68030fb/em68030fb.ko
+            drivers/em68030input/em68030input.ko
