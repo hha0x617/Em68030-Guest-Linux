@@ -8,3 +8,4 @@
 *.symvers
 .tmp_versions/
 modules.builtin
+output/

@@ -27,6 +27,23 @@ mv em68030input-*.ko em68030input.ko
 
 The `vmlinux` image can be loaded directly by the emulator (File → Open ELF).
 
+## Building with Docker
+
+Requires Docker only — no cross-compiler installation needed.
+
+**Linux / macOS / WSL:**
+```bash
+./build.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\build.ps1
+```
+
+The kernel source is downloaded automatically from kernel.org.
+Output files are placed in `output/`.
+
 ## Contents
 
 ### drivers/em68030fb/
