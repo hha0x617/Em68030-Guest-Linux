@@ -44,6 +44,13 @@ Requires Docker only — no cross-compiler installation needed.
 The kernel source is downloaded automatically from kernel.org.
 Output files are placed in `output/`.
 
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Framebuffer Display Setup](docs/setup_framebuffer.md) | fbcon and X Window System setup on the Linux guest |
+| [フレームバッファディスプレイ セットアップ](docs/setup_framebuffer_ja.md) | 日本語版 |
+
 ## Contents
 
 ### drivers/em68030fb/
