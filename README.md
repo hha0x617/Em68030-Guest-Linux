@@ -3,7 +3,9 @@
 [Japanese documentation (README_ja.md)](README_ja.md)
 
 Guest-side Linux kernel modules, patches, and configurations for the
-[Em68030](https://github.com/hha0x617/Em68030_WinUI3Cpp) MC68030/MVME147 emulator.
+Em68030 MC68030/MVME147 emulator
+([C++/WinUI3](https://github.com/hha0x617/Em68030_WinUI3Cpp),
+[C#/WPF](https://github.com/hha0x617/Em68030_CsWPF)).
 
 ## License
 
