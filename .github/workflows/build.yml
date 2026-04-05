@@ -92,7 +92,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           sudo apt-get update && sudo apt-get install -y clamav
-          sudo freshclam || true
+          sudo systemctl stop clamav-freshclam 2>/dev/null || true
+          sudo freshclam
           echo "Scanning artifacts..."
           clamscan --infected --recursive artifacts/
           if [ $? -eq 1 ]; then
