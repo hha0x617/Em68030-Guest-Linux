@@ -3,8 +3,8 @@
 [English documentation (README.md)](README.md)
 
 Em68030 MC68030/MVME147 エミュレータ
-([C++/WinUI3](https://github.com/hha0x617/Em68030_WinUI3Cpp),
-[C#/WPF](https://github.com/hha0x617/Em68030_CsWPF))
+([Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp),
+[Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF))
 用の Linux ゲスト側カーネルモジュール、パッチ、設定ファイルです。
 
 ## ライセンス
