@@ -84,6 +84,19 @@ jobs:
           cp drivers/em68030fb/em68030fb.ko "artifacts/em68030fb-${SHORT_HASH}.ko"
           cp drivers/em68030input/em68030input.ko "artifacts/em68030input-${SHORT_HASH}.ko"
 
+      - name: Virus scan artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          sudo apt-get update && sudo apt-get install -y clamav
+          sudo freshclam || true
+          echo "Scanning artifacts..."
+          clamscan --infected --recursive artifacts/
+          if [ $? -eq 1 ]; then
+            echo "::error::Virus detected in artifacts"
+            exit 1
+          fi
+          echo "Scan passed: no threats detected."
+
       - name: Upload artifact
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
