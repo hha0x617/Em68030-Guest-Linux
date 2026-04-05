@@ -129,6 +129,9 @@ jobs:
           mv em68030input-*.ko em68030input.ko
           \`\`\`
 
+          ### Security
+          - Virus scan: **Passed** (ClamAV, signatures updated at build time)
+
           ### Source Code (GPL-2.0)
           The kernel image is built from Linux ${{ env.KERNEL_VERSION }} with patches and configuration from this repository:
           - **Kernel source**: https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
