@@ -128,6 +128,7 @@ jobs:
           SHORT_HASH=$(git rev-parse --short HEAD)
           TAG="${{ github.ref_name }}"
           SUFFIX="${{ env.KERNEL_VERSION }}-mvme147-uart16550-${{ env.CONFIG_NAME }}-${SHORT_HASH}"
+          gh release delete "$TAG" --yes 2>/dev/null || true
           gh release create "$TAG" artifacts/* --title "$TAG" --notes "$(cat <<EOF
           ## Em68030 Guest Linux ${TAG}
 
