@@ -88,6 +88,17 @@ jobs:
           cp drivers/em68030fb/em68030fb.ko "artifacts/em68030fb-${SHORT_HASH}.ko"
           cp drivers/em68030input/em68030input.ko "artifacts/em68030input-${SHORT_HASH}.ko"
 
+      - name: Create modules ISO
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          sudo apt-get install -y genisoimage
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          mkdir -p iso-staging
+          cp drivers/em68030fb/em68030fb.ko iso-staging/
+          cp drivers/em68030input/em68030input.ko iso-staging/
+          genisoimage -o "artifacts/modules-${SHORT_HASH}.iso" -R -J iso-staging/
+          echo "ISO created: $(du -h "artifacts/modules-${SHORT_HASH}.iso" | cut -f1)"
+
       - name: Virus scan artifacts
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -126,9 +137,21 @@ jobs:
           - **vmlinux-${SUFFIX}** — Kernel image (load via File → Open ELF)
           - **em68030fb-${SHORT_HASH}.ko** — Framebuffer driver module
           - **em68030input-${SHORT_HASH}.ko** — Virtual keyboard/mouse driver module
+          - **modules-${SHORT_HASH}.iso** — ISO image containing both modules (mount as SCSI CD-ROM)
 
-          ### Note
-          Rename \`.ko\` files to their original names before installing on the guest:
+          ### Installing modules
+          **Option A: ISO image (recommended)**
+          Load \`modules-${SHORT_HASH}.iso\` as SCSI CD-ROM in emulator settings, then:
+          \`\`\`bash
+          mount /dev/sr0 /mnt        # Linux
+          mount -t cd9660 /dev/cd0a /mnt  # NetBSD
+          cp /mnt/*.ko /lib/modules/\$(uname -r)/extra/
+          depmod -a
+          umount /mnt
+          \`\`\`
+
+          **Option B: Individual .ko files**
+          Download and rename \`.ko\` files before installing on the guest:
           \`\`\`bash
           mv em68030fb-*.ko em68030fb.ko
           mv em68030input-*.ko em68030input.ko
