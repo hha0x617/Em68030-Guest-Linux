@@ -144,8 +144,7 @@ jobs:
           **Option A: ISO image (recommended)**
           Load \`modules-${SHORT_HASH}.iso\` as SCSI CD-ROM in emulator settings, then:
           \`\`\`bash
-          mount /dev/sr0 /mnt        # Linux
-          mount -t cd9660 /dev/cd0a /mnt  # NetBSD
+          mount /dev/sr0 /mnt
           cp /mnt/*.ko /lib/modules/\$(uname -r)/extra/
           depmod -a
           umount /mnt
