@@ -238,3 +238,35 @@ cp /path/to/em68030-guest-linux/configs/.config.20260312_FB_SIMPLE \
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- olddefconfig
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
 ```
+
+## Acknowledgments
+
+This project depends on the continued effort of the Linux kernel community and
+downstream distribution communities to keep Linux/m68k functional on modern
+systems. We would like to express our sincere thanks to:
+
+- **The Linux kernel community** — and especially the m68k subsystem maintainers
+  and contributors on the `linux-m68k` mailing list — for keeping the m68k
+  architecture functional in modern Linux kernels. The out-of-tree modules and
+  in-tree patches in this repository plug directly into subsystems (fbdev, evdev,
+  serial, SCSI) maintained by the broader kernel community. See
+  http://www.linux-m68k.org/
+
+- **The Debian Project and the Debian Ports team** — for maintaining the
+  Debian/m68k unofficial port, which consumes the kernel modules and patches from
+  this repository. The broader Debian community's policy of welcoming
+  non-release architectures is what gives this work a practical use case. See
+  https://www.ports.debian.org/
+
+- **The Gentoo Project and the Gentoo m68k team** — for publishing regular stage3
+  tarballs and keeping the portage tree working for m68k, providing another
+  downstream target for the drivers developed here. See
+  https://wiki.gentoo.org/wiki/M68k
+
+Their continuous effort is what makes this project possible.
+
+## Related Projects
+
+- [Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp) — Emulator (C++/WinUI3)
+- [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF) — Emulator (C#/WPF)
+- [Em68030-Guest-NetBSD](https://github.com/hha0x617/Em68030-Guest-NetBSD) — NetBSD guest components

@@ -236,3 +236,34 @@ cp /path/to/em68030-guest-linux/configs/.config.20260312_FB_SIMPLE \
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- olddefconfig
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
 ```
+
+## 謝辞
+
+このプロジェクトは、Linux/m68k を現代のシステム上で機能させ続けている Linux カーネル
+コミュニティと、下流のディストリビューションコミュニティの継続的な活動に依存しています。
+以下のプロジェクトとそのメンテナーの方々に、心より感謝申し上げます:
+
+- **Linux カーネルコミュニティ** — 特に m68k サブシステムのメンテナーの方々と
+  `linux-m68k` メーリングリストの貢献者の皆様 — に感謝します。このリポジトリの
+  out-of-tree モジュールおよび in-tree パッチは、広く Linux カーネルコミュニティに
+  よって維持されている各サブシステム (fbdev, evdev, シリアル, SCSI) に直接
+  結合しています。http://www.linux-m68k.org/
+
+- **The Debian Project / Debian Ports チーム** — このリポジトリのカーネルモジュールと
+  パッチの消費元である Debian/m68k unofficial port を維持していただいていることに
+  感謝します。Debian コミュニティ全体が「リリース対象外アーキテクチャも歓迎する」
+  という方針を取り続けていただいているからこそ、この活動に実用的な意味があります。
+  https://www.ports.debian.org/
+
+- **The Gentoo Project / Gentoo m68k チーム** — m68k 向け stage3 tarball の定期的な
+  公開と、portage ツリーの m68k 対応の維持に感謝します。Gentoo はこのリポジトリで
+  開発されるドライバのもう一つの下流ターゲットです。
+  https://wiki.gentoo.org/wiki/M68k
+
+皆様の継続的な活動によって、このプロジェクトが成立しています。
+
+## 関連プロジェクト
+
+- [Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp) — エミュレータ (C++/WinUI3)
+- [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF) — エミュレータ (C#/WPF)
+- [Em68030-Guest-NetBSD](https://github.com/hha0x617/Em68030-Guest-NetBSD) — NetBSD ゲストコンポーネント
