@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a kernel-config tweak, driver feature, build improvement, or new doc
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repo focuses on the **m68k Linux guest** for the
+        em68030 emulator.  Feature requests for the emulator host
+        (CPU, devices, GUI) belong on the
+        [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF)
+        or
+        [Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp)
+        repository.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Kernel module (em68030fb / em68030input)
+        - Kernel config (configs/.config.*)
+        - Kernel patches against upstream
+        - Build scripts / Docker
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation — what problem does this solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context / references

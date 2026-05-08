@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/hha0x617/Em68030-Guest-Linux/security/advisories/new
+    about: Please report security issues privately via Private Vulnerability Reporting (see SECURITY.md).
+  - name: Upstream Linux kernel issue
+    url: https://kernel.org/category/security.html
+    about: Bugs in the upstream Linux kernel itself (not in this repo's drivers / patches) belong to the kernel project, not here.
+  - name: Emulator (em68030) issue
+    url: https://github.com/hha0x617/Em68030_CsWPF/issues/new/choose
+    about: If the bug is in the emulator host (CPU emulation, devices, settings UI) rather than the guest Linux build, file it on the em68030 repos.
