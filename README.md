@@ -270,3 +270,9 @@ Their continuous effort is what makes this project possible.
 - [Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp) — Emulator (C++/WinUI3)
 - [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF) — Emulator (C#/WPF)
 - [Em68030-Guest-NetBSD](https://github.com/hha0x617/Em68030-Guest-NetBSD) — NetBSD guest components
+
+## Contributing and Policies
+
+- Contribution workflow: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Code of Conduct: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1)
+- Security: [`SECURITY.md`](SECURITY.md)
