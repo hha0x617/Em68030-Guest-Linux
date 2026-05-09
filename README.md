@@ -7,6 +7,15 @@ Em68030 MC68030/MVME147 emulator
 ([Em68030_WinUI3Cpp](https://github.com/hha0x617/Em68030_WinUI3Cpp),
 [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF)).
 
+*The repository-specific assets — the `em68030fb` / `em68030input`
+drivers under `drivers/`, the kernel patches under `patches/`, the
+kernel configs under `configs/`, the build glue under `docker/` and
+`build.sh` / `build.ps1`, and the GitHub Actions workflows — are
+authored through vibe coding with
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+The upstream Linux kernel source itself is **not** AI-generated; it
+is fetched verbatim from kernel.org at build time.*
+
 ## License
 
 This repository is licensed under GPL-2.0-only. See [LICENSE](LICENSE) for details.
