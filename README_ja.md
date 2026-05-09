@@ -7,6 +7,15 @@ Em68030 MC68030/MVME147 エミュレータ
 [Em68030_CsWPF](https://github.com/hha0x617/Em68030_CsWPF))
 用の Linux ゲスト側カーネルモジュール、パッチ、設定ファイルです。
 
+*リポジトリ固有のアセット (`drivers/` 以下の `em68030fb` /
+`em68030input` ドライバ、`patches/` のカーネルパッチ、`configs/` の
+カーネル設定、`docker/` および `build.sh` / `build.ps1` のビルド
+スクリプト、GitHub Actions ワークフロー) は
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) との
+vibe coding で開発しています。上流の Linux カーネルソース本体は
+AI 生成ではありません — ビルド時に kernel.org からそのまま取得して
+います。*
+
 ## ライセンス
 
 本リポジトリは GPL-2.0-only でライセンスされています。詳細は [LICENSE](LICENSE) を参照してください。
