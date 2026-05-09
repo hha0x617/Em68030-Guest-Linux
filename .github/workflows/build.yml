@@ -5,6 +5,17 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+    # Skip the kernel build for changes that can't affect it
+    # (docs, policy files, etc.).  Keeps docs-only PRs from
+    # waiting on a long m68k cross-compile cycle.
+    paths:
+      - 'configs/**'
+      - 'drivers/**'
+      - 'patches/**'
+      - 'docker/**'
+      - 'build.sh'
+      - 'build.ps1'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 env:
@@ -35,8 +46,15 @@ jobs:
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           cd ~
-          curl -sLO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
-          curl -sL https://cdn.kernel.org/pub/linux/kernel/v6.x/sha256sums.asc | grep "linux-${{ env.KERNEL_VERSION }}.tar.xz" > expected.sha256
+          # `--fail` makes curl exit non-zero on HTTP errors so we surface
+          # network problems at the curl call site rather than later when
+          # `sha256sum -c` sees an HTML error page in expected.sha256.
+          # `--retry 5 --retry-delay 10 --retry-all-errors` rides through
+          # transient CDN flakes (5xx, partial files, connection resets).
+          # Same pattern as Em68030-Guest-NetBSD's build.yml.
+          CURL_OPTS="--retry 5 --retry-delay 10 --retry-all-errors --fail"
+          curl -sLO $CURL_OPTS https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
+          curl -sL $CURL_OPTS https://cdn.kernel.org/pub/linux/kernel/v6.x/sha256sums.asc | grep "linux-${{ env.KERNEL_VERSION }}.tar.xz" > expected.sha256
           sha256sum -c expected.sha256
           tar xJf linux-${{ env.KERNEL_VERSION }}.tar.xz
           rm linux-${{ env.KERNEL_VERSION }}.tar.xz expected.sha256
