@@ -1,0 +1,50 @@
+diff -uprN linux-7.0.orig/arch/m68k/mvme147/config.c linux-7.0/arch/m68k/mvme147/config.c
+--- linux-7.0.orig/arch/m68k/mvme147/config.c
++++ linux-7.0/arch/m68k/mvme147/config.c
+@@ -22,6 +22,9 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/rtc/m48t59.h>
++// begin: 2026.03.08 hha0x617
++#include <linux/serial_8250.h>
++// end: 2026.03.08 hha0x617
+
+ #include <asm/bootinfo.h>
+ #include <asm/bootinfo-vme.h>
+@@ -195,6 +198,36 @@ static void scc_write(char ch)
+ 	out_8(M147_SCC_A_ADDR, ch);
+ }
+
++// begin: 2026.03.08 hha0x617
++static struct plat_serial8250_port mvme147_uart_data[] = {
++      {
++              .mapbase  = 0xFFFE2000,
++              .irq      = 0,             /* polling mode */
++              .uartclk  = 1843200,
++              .iotype   = UPIO_MEM,
++              .flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
++              .regshift = 0,
++      },
++      { },
++};
++
++static struct platform_device mvme147_uart_device = {
++      .name = "serial8250",
++      .id   = PLAT8250_DEV_PLATFORM,
++      .dev  = {
++              .platform_data = mvme147_uart_data,
++      },
++};
++
++static int __init mvme147_uart_init(void)
++{
++      if (!MACH_IS_MVME147)
++              return -ENODEV;
++      return platform_device_register(&mvme147_uart_device);
++}
++device_initcall(mvme147_uart_init);
++// end: 2026.03.08 hha0x617
++
+ void mvme147_scc_write(struct console *co, const char *str, unsigned int count)
+ {
+ 	unsigned long flags;

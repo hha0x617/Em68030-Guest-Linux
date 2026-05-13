@@ -17,9 +17,14 @@ on:
       - 'build.ps1'
       - '.github/workflows/build.yml'
   workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Linux kernel version. The major component selects both the kernel.org URL (vN.x/) and patches/linux-N/. Examples: 6.12.17, 7.0.6.'
+        required: false
+        default: '6.12.17'
 
 env:
-  KERNEL_VERSION: "6.12.17"
+  KERNEL_VERSION: ${{ github.event.inputs.kernel_version || '6.12.17' }}
   CONFIG_NAME: "fbconsole+evdev"
   CONFIG_FILE: "configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV"
 
@@ -31,6 +36,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Derive KERNEL_MAJOR
+        id: kver
+        run: |
+          MAJOR="${KERNEL_VERSION%%.*}"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "KERNEL_MAJOR=$MAJOR" >> "$GITHUB_ENV"
+          echo "Using Linux ${KERNEL_VERSION} (major v${MAJOR}.x)"
 
       - name: Install m68k cross-compiler
         run: sudo apt-get update && sudo apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu make bc flex bison libelf-dev libssl-dev
@@ -53,11 +66,12 @@ jobs:
           # transient CDN flakes (5xx, partial files, connection resets).
           # Same pattern as Em68030-Guest-NetBSD's build.yml.
           CURL_OPTS="--retry 5 --retry-delay 10 --retry-all-errors --fail"
-          curl -sLO $CURL_OPTS https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
-          curl -sL $CURL_OPTS https://cdn.kernel.org/pub/linux/kernel/v6.x/sha256sums.asc | grep "linux-${{ env.KERNEL_VERSION }}.tar.xz" > expected.sha256
+          BASE_URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x"
+          curl -sLO $CURL_OPTS "${BASE_URL}/linux-${KERNEL_VERSION}.tar.xz"
+          curl -sL $CURL_OPTS "${BASE_URL}/sha256sums.asc" | grep "linux-${KERNEL_VERSION}.tar.xz" > expected.sha256
           sha256sum -c expected.sha256
-          tar xJf linux-${{ env.KERNEL_VERSION }}.tar.xz
-          rm linux-${{ env.KERNEL_VERSION }}.tar.xz expected.sha256
+          tar xJf linux-${KERNEL_VERSION}.tar.xz
+          rm linux-${KERNEL_VERSION}.tar.xz expected.sha256
 
       - name: Apply patches
         run: |
@@ -65,10 +79,16 @@ jobs:
           git init -q 2>/dev/null || true
           git add -A 2>/dev/null && git commit -q -m "baseline" --allow-empty 2>/dev/null || true
           git checkout -q -- . 2>/dev/null || true
-          for patch in $GITHUB_WORKSPACE/patches/*.patch; do
-            echo "Applying $(basename $patch)..."
-            patch -p1 -N < "$patch" || true
-          done
+          PATCH_DIR="$GITHUB_WORKSPACE/patches/linux-${KERNEL_MAJOR}"
+          if [ -d "$PATCH_DIR" ]; then
+            for patch in "$PATCH_DIR"/*.patch; do
+              [ -e "$patch" ] || continue
+              echo "Applying $(basename "$patch")..."
+              patch -p1 -N < "$patch" || true
+            done
+          else
+            echo "No patches for linux-${KERNEL_MAJOR}"
+          fi
 
       - name: Build kernel
         run: |
@@ -180,8 +200,8 @@ jobs:
 
           ### Source Code (GPL-2.0)
           The kernel image is built from Linux ${{ env.KERNEL_VERSION }} with patches and configuration from this repository:
-          - **Kernel source**: https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
-          - **Patches**: [patches/](https://github.com/${{ github.repository }}/tree/${TAG}/patches)
+          - **Kernel source**: https://cdn.kernel.org/pub/linux/kernel/v${{ env.KERNEL_MAJOR }}.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
+          - **Patches**: [patches/linux-${{ env.KERNEL_MAJOR }}/](https://github.com/${{ github.repository }}/tree/${TAG}/patches/linux-${{ env.KERNEL_MAJOR }})
           - **Config**: [${{ env.CONFIG_FILE }}](https://github.com/${{ github.repository }}/blob/${TAG}/${{ env.CONFIG_FILE }})
           - **Build workflow**: [.github/workflows/build.yml](https://github.com/${{ github.repository }}/blob/${TAG}/.github/workflows/build.yml)
           EOF
