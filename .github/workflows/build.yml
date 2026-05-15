@@ -3,19 +3,14 @@ name: Build Kernel and Modules
 on:
   push:
     tags: ['v*']
+  # Triggered on every PR so the required `build` status check is always
+  # reported.  Docs-only PRs would otherwise deadlock against branch
+  # protection: the workflow never ran, so the required check was never
+  # satisfied.  The job now decides internally whether to run the heavy
+  # m68k cross-build (see the "Detect relevant changes" step below) and
+  # exits successfully without it for docs-only PRs.
   pull_request:
     branches: [main]
-    # Skip the kernel build for changes that can't affect it
-    # (docs, policy files, etc.).  Keeps docs-only PRs from
-    # waiting on a long m68k cross-compile cycle.
-    paths:
-      - 'configs/**'
-      - 'drivers/**'
-      - 'patches/**'
-      - 'docker/**'
-      - 'build.sh'
-      - 'build.ps1'
-      - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
       kernel_version:
@@ -36,8 +31,39 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Need history to diff the PR against its base in
+          # "Detect relevant changes".  Cheap on this small repo.
+          fetch-depth: 0
+
+      - name: Detect relevant changes
+        id: filter
+        run: |
+          # Non-PR events (tag push, manual dispatch) always run the full
+          # build — they're how Releases get produced, and they're how a
+          # contributor triggers a manual smoke build.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            echo "Non-PR event (${{ github.event_name }}) — running full build."
+            exit 0
+          fi
+          # PR event: diff the merge base against HEAD and decide whether
+          # any of the build-affecting paths were touched.  This keeps the
+          # same set of paths the old `pull_request.paths:` filter listed.
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD)
+          echo "Files changed in this PR:"
+          echo "$CHANGED" | sed 's/^/  /'
+          if echo "$CHANGED" | grep -qE '^(configs/|drivers/|patches/|docker/|build\.sh$|build\.ps1$|\.github/workflows/build\.yml$)'; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            echo "Build-relevant files changed — running full build."
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No build-relevant files changed (docs-only PR); reporting success without running the m68k cross-build."
+          fi
 
       - name: Derive KERNEL_MAJOR
+        if: steps.filter.outputs.relevant == 'true'
         id: kver
         run: |
           MAJOR="${KERNEL_VERSION%%.*}"
@@ -46,9 +72,11 @@ jobs:
           echo "Using Linux ${KERNEL_VERSION} (major v${MAJOR}.x)"
 
       - name: Install m68k cross-compiler
+        if: steps.filter.outputs.relevant == 'true'
         run: sudo apt-get update && sudo apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu make bc flex bison libelf-dev libssl-dev
 
       - name: Cache kernel source
+        if: steps.filter.outputs.relevant == 'true'
         id: cache-kernel
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -56,7 +84,7 @@ jobs:
           key: kernel-src-${{ env.KERNEL_VERSION }}
 
       - name: Download kernel source
-        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        if: steps.filter.outputs.relevant == 'true' && steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           cd ~
           # `--fail` makes curl exit non-zero on HTTP errors so we surface
@@ -74,6 +102,7 @@ jobs:
           rm linux-${KERNEL_VERSION}.tar.xz expected.sha256
 
       - name: Apply patches
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           cd ~/linux-${{ env.KERNEL_VERSION }}
           git init -q 2>/dev/null || true
@@ -91,6 +120,7 @@ jobs:
           fi
 
       - name: Build kernel
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           cd ~/linux-${{ env.KERNEL_VERSION }}
           cp $GITHUB_WORKSPACE/${{ env.CONFIG_FILE }} .config
@@ -100,24 +130,28 @@ jobs:
           cp vmlinux.symvers Module.symvers
 
       - name: Build em68030fb module
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- \
             -C ~/linux-${{ env.KERNEL_VERSION }} \
             M=$GITHUB_WORKSPACE/drivers/em68030fb modules
 
       - name: Build em68030input module
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- \
             -C ~/linux-${{ env.KERNEL_VERSION }} \
             M=$GITHUB_WORKSPACE/drivers/em68030input modules
 
       - name: Verify build outputs
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           file ~/linux-${{ env.KERNEL_VERSION }}/vmlinux
           file drivers/em68030fb/em68030fb.ko
           file drivers/em68030input/em68030input.ko
 
       - name: Prepare artifacts
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           mkdir -p artifacts
           SHORT_HASH=$(git rev-parse --short HEAD)
