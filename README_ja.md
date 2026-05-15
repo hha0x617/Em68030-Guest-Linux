@@ -50,12 +50,45 @@ mv em68030input-*.ko em68030input.ko
 
 | ステータス | バージョン |
 |---|---|
-| デフォルト (CI 成果物) | **6.12.17** |
-| 検証済 (KPI + パッチ apply) | **7.0.x** — フルクロスビルドおよびエミュレータ実機 boot は 11.0 後追従と同じく後続作業 |
+| デフォルト (CI 成果物)、通常利用推奨 | **6.12.17** |
+| ビルド・ブートはできるが [LANCE TX に既知のリグレッション](#既知の問題-linux-70-での-lance-ethernet) — ネットワーク非依存用途のみ | **7.0.x** |
 
 7.0.x を選ぶ場合は `--kernel-version 7.0.6` (build.sh)、
 `-KernelVersion 7.0.6` (build.ps1)、もしくは
 `workflow_dispatch` の `kernel_version: 7.0.6` を渡してください。
+
+### 既知の問題: Linux 7.0 での LANCE Ethernet
+
+オンボードの MVME147 LANCE ドライバは Linux 7.0 では送信ができません。
+カーネルは `eth0` を `UP` と認識し、LANCE IRQ も登録されますが、
+`lance_start_xmit` は決して完了せず (TX packets は 0 のまま、
+`NETDEV WATCHDOG: ... transmit queue 0 timed out 5010 ms` が 5 秒ごとに
+繰り返される)。実機 MVME147 では一部構成で動作するという報告もあるようですが、
+Em68030 エミュレータ上では WinUI3 / WPF どちらのフロントエンドでも
+再現性 100% で失敗します。
+
+診断: `drivers/net/ethernet/amd/7990.h` の `LANCE_ADDR(x)` マクロは
+CPU ポインタの下位 24 ビットだけを取り出して LANCE チップに 24-bit DMA
+アドレスとして渡します。これはカーネルが LANCE DMA バッファ用に確保した
+仮想アドレスの下位 24 ビットが物理アドレスと一致するときに正しく動きます。
+Linux 7.0 の m68k ではこの不変条件が崩れており、`__get_dma_pages()` が
+返すバッファの下位 24 ビットは物理 RAM と一致しなくなっているため、LANCE
+(およびエミュレータの plugin) は誤った物理領域を指し示され、init block が
+あるべき位置でカーネル text 領域のバイトを読んでしまいます。
+
+LANCE ドライバのソース自体は 6.12 と 7.0 で bit 単位で同一です。リグレッション
+はドライバ外部から、おそらく 6.13/7.0 に入った `arch/m68k/mvme147/config.c`
+のプラットフォームコード改修 (rtc-m48t59 移行、early console 復元) 由来と
+思われます。原因コミットの二分検索はまだ未実施です。
+
+**回避策:** ネットワークが必要な場合は `KERNEL_VERSION=6.12.17` (デフォルト)
+のままにしておく。
+
+[Releases](https://github.com/hha0x617/Em68030-Guest-Linux/releases) の
+成果物はデフォルトで 6.12.17 ビルドです。ネットワーク非依存のワークロード
+向けに 7.0 ビルドを作るには `build.sh` / `build.ps1` に `--kernel-version
+7.0.6` を渡すか、`workflow_dispatch` フォームで `kernel_version` を指定して
+ください。
 
 ## Docker によるビルド
 

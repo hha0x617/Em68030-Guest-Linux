@@ -51,12 +51,43 @@ appropriate patch subdirectory under `patches/linux-6/` vs
 
 | Status | Version |
 |---|---|
-| Default (CI artifacts) | **6.12.17** |
-| Validated (KPIs + patches) | **7.0.x** — apply / build paths exercised; full cross-build + boot smoke test pending. |
+| Default (CI artifacts), recommended for everyday use | **6.12.17** |
+| Builds and boots, but has a [known LANCE TX regression](#known-issue-lance-ethernet-on-linux-70) — use only for non-network workloads | **7.0.x** |
 
 To opt into 7.0.x, pass `--kernel-version 7.0.6` (build.sh),
 `-KernelVersion 7.0.6` (build.ps1), or `kernel_version: 7.0.6` via
 `workflow_dispatch`.
+
+### Known issue: LANCE Ethernet on Linux 7.0
+
+The on-board MVME147 LANCE driver does not transmit on Linux 7.0 — the kernel
+sees `eth0` as `UP` and the LANCE IRQ is registered, but `lance_start_xmit`
+never completes (TX packets stay at 0, `NETDEV WATCHDOG: ... transmit queue 0
+timed out 5010 ms` recurs every 5 seconds). The same kernel works on real
+MVME147 hardware in some configurations, but reliably fails under the Em68030
+emulator on both the WinUI3 and WPF frontends.
+
+Diagnosis: the `LANCE_ADDR(x)` macro in `drivers/net/ethernet/amd/7990.h` masks
+a CPU pointer to its low 24 bits and feeds the result to the LANCE chip as a
+24-bit DMA address. That works when the kernel's virtual address for the LANCE
+DMA buffer happens to share its low 24 bits with the physical address. On
+Linux 7.0 m68k that invariant is broken — `__get_dma_pages()` returns a buffer
+whose low 24 bits no longer match physical RAM, so the LANCE (and the
+emulator's plugin) is pointed at the wrong physical region and reads kernel
+text bytes where the init block should be.
+
+The LANCE driver source is bit-identical between 6.12 and 7.0; the regression
+comes from outside the driver, likely from the platform-code rework around
+`arch/m68k/mvme147/config.c` (rtc-m48t59 migration, early console reinstate)
+that landed in 6.13/7.0. We have not yet bisected the exact offending commit.
+
+**Workaround:** stay on `KERNEL_VERSION=6.12.17` (the default) when networking
+is required.
+
+The artifact in [Releases](https://github.com/hha0x617/Em68030-Guest-Linux/releases)
+is the 6.12.17 build by default. To produce a 7.0 build for non-network
+workloads, pass `--kernel-version 7.0.6` to `build.sh` / `build.ps1` or set the
+`kernel_version` input on the `workflow_dispatch` form.
 
 ## Building with Docker
 
