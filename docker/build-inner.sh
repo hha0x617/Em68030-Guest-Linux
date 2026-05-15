@@ -5,16 +5,26 @@ set -euo pipefail
 : "${CONFIG_NAME:=fbconsole+evdev}"
 : "${CONFIG_FILE:=configs/.config.20260314_FB_CONSOLE_with_INPUT_EVDEV}"
 
-echo "--- Downloading kernel source ---"
+# Derive the major version (6, 7, ...) from KERNEL_VERSION to select the
+# kernel.org URL path (vN.x/) and the matching patch subdirectory.
+KERNEL_MAJOR="${KERNEL_VERSION%%.*}"
+PATCH_DIR="/build/patches/linux-${KERNEL_MAJOR}"
+
+echo "--- Downloading kernel source (Linux ${KERNEL_VERSION}) ---"
 cd /build
-curl -sL "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz" | tar xJ
+curl -sL "https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz" | tar xJ
 cd "linux-${KERNEL_VERSION}"
 
-echo "--- Applying patches ---"
-for patch in /build/patches/*.patch; do
-    echo "Applying $(basename "$patch")..."
-    patch -p1 -N < "$patch" || true
-done
+echo "--- Applying patches (from ${PATCH_DIR}) ---"
+if [ -d "$PATCH_DIR" ]; then
+    for patch in "$PATCH_DIR"/*.patch; do
+        [ -e "$patch" ] || continue
+        echo "Applying $(basename "$patch")..."
+        patch -p1 -N < "$patch" || true
+    done
+else
+    echo "  (no patches for linux-${KERNEL_MAJOR})"
+fi
 
 echo "--- Configuring kernel ---"
 cp "/build/${CONFIG_FILE}" .config
@@ -33,7 +43,10 @@ make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- \
     -C "/build/linux-${KERNEL_VERSION}" M=/tmp/drivers/em68030input modules
 
 echo "--- Copying output ---"
-SHORT_HASH=$(cd /build/patches && md5sum *.patch "/build/${CONFIG_FILE}" | md5sum | cut -c1-7)
+# Hash inputs across the active patch subdir + active config so the suffix
+# tracks the actual ingredients of the build.
+HASH_INPUTS=$( { find "$PATCH_DIR" -name '*.patch' -print0 2>/dev/null | xargs -0 md5sum 2>/dev/null; md5sum "/build/${CONFIG_FILE}"; } | md5sum | cut -c1-7)
+SHORT_HASH="$HASH_INPUTS"
 SUFFIX="${KERNEL_VERSION}-mvme147-uart16550-${CONFIG_NAME}-${SHORT_HASH}"
 cp vmlinux "/build/output/vmlinux-${SUFFIX}"
 cp /tmp/drivers/em68030fb/em68030fb.ko "/build/output/em68030fb-${SHORT_HASH}.ko"

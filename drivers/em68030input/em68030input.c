@@ -233,7 +233,7 @@ static int __init em68030input_init(void)
 
 static void __exit em68030input_exit(void)
 {
-	del_timer_sync(&poll_timer);
+	timer_delete_sync(&poll_timer);
 	input_unregister_device(mouse_dev);
 	input_unregister_device(tablet_dev);
 	input_unregister_device(kbd_dev);

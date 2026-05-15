@@ -40,18 +40,38 @@ mv em68030input-*.ko em68030input.ko
 
 The `vmlinux` image can be loaded directly by the emulator (File → Open ELF).
 
+## Supported kernel versions
+
+The build infrastructure is parameterized on `KERNEL_VERSION` and accepts
+both Linux 6.12.17 (default — what current CI artifacts are built against)
+and Linux 7.0.x.  The major component is used both to compose the
+kernel.org URL (`pub/linux/kernel/v6.x/` vs `v7.x/`) and to select the
+appropriate patch subdirectory under `patches/linux-6/` vs
+`patches/linux-7/`.
+
+| Status | Version |
+|---|---|
+| Default (CI artifacts) | **6.12.17** |
+| Validated (KPIs + patches) | **7.0.x** — apply / build paths exercised; full cross-build + boot smoke test pending. |
+
+To opt into 7.0.x, pass `--kernel-version 7.0.6` (build.sh),
+`-KernelVersion 7.0.6` (build.ps1), or `kernel_version: 7.0.6` via
+`workflow_dispatch`.
+
 ## Building with Docker
 
 Requires Docker only — no cross-compiler installation needed.
 
 **Linux / macOS / WSL:**
 ```bash
-./build.sh
+./build.sh                            # defaults to 6.12.17
+./build.sh --kernel-version 7.0.6     # build against Linux 7.0.6
 ```
 
 **Windows (PowerShell):**
 ```powershell
-.\build.ps1
+.\build.ps1                                  # defaults to 6.12.17
+.\build.ps1 -KernelVersion 7.0.6             # build against Linux 7.0.6
 ```
 
 The kernel source is downloaded automatically from kernel.org.
@@ -91,7 +111,7 @@ On the **host** (cross-build environment), with the kernel source tree used to b
 the running kernel. The kernel must have been fully built (`vmlinux`) first.
 ```bash
 # Build the kernel first (skip if you already have vmlinux)
-cd /path/to/linux-6.12.17
+cd /path/to/linux-${KERNEL_VERSION}
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
 
 # Kernel 6.12+ writes exported symbols to vmlinux.symvers, but out-of-tree
@@ -100,7 +120,7 @@ cp vmlinux.symvers Module.symvers
 
 # Cross-compile the module
 cd /path/to/em68030-guest-linux/drivers/em68030fb
-make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-6.12.17 M=$(pwd) modules
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-${KERNEL_VERSION} M=$(pwd) modules
 ```
 
 Copy the resulting `em68030fb.ko` to the guest disk image.
@@ -120,7 +140,7 @@ cat /dev/urandom > /dev/fb0   # noise should appear in emulator's framebuffer wi
 
 On the host, cross-compile the install target:
 ```bash
-make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-6.12.17 M=$(pwd) \
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-${KERNEL_VERSION} M=$(pwd) \
   INSTALL_MOD_PATH=/path/to/guest-rootfs modules_install
 ```
 
@@ -165,7 +185,7 @@ Registers three input devices:
 **Cross-compile on the host:**
 ```bash
 cd /path/to/em68030-guest-linux/drivers/em68030input
-make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-6.12.17 M=$(pwd) modules
+make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- -C /path/to/linux-${KERNEL_VERSION} M=$(pwd) modules
 ```
 
 Copy the resulting `em68030input.ko` to the guest disk image.
@@ -196,7 +216,9 @@ echo em68030input > /etc/modules-load.d/em68030input.conf
 
 ### patches/
 
-Kernel source patches for Em68030-specific MVME147 support.
+Kernel source patches for Em68030-specific MVME147 support.  Organized by
+kernel major version (`patches/linux-6/`, `patches/linux-7/`); the build
+infrastructure applies the subdirectory that matches `KERNEL_VERSION`.
 
 #### `mvme147-uart-16550.patch`
 
@@ -209,10 +231,17 @@ userspace console (`/dev/ttyS0`).
 Without this patch, the kernel boots and `earlyprintk` works, but userspace has no
 console device (`Warning: unable to open an initial console`).
 
+Two flavours are shipped because Linux 7.0 has already pulled
+`linux/platform_device.h` into the upstream MVME147 config and dropped
+`linux/rtc.h` from the include block — see the
+[`linux-6/`](patches/linux-6/) and [`linux-7/`](patches/linux-7/)
+versions of the patch.
+
 **Apply:**
 ```bash
-cd /path/to/linux-6.12.17
-patch -p1 < /path/to/em68030-guest-linux/patches/mvme147-uart-16550.patch
+cd /path/to/linux-${KERNEL_VERSION}
+KERNEL_MAJOR=${KERNEL_VERSION%%.*}
+patch -p1 < /path/to/em68030-guest-linux/patches/linux-${KERNEL_MAJOR}/mvme147-uart-16550.patch
 ```
 
 **Required kernel config:**
@@ -224,9 +253,12 @@ in the emulator repository for the full kernel build procedure.
 
 ### configs/
 
-Saved `.config` files for the Linux 6.12.17 kernel, based on `mvme16x_defconfig`
-with Em68030-specific options enabled. These can be copied to the kernel source
-tree as `.config` instead of running `menuconfig` manually.
+Saved `.config` files based on `mvme16x_defconfig` with Em68030-specific
+options enabled.  The first-line `# Linux/m68k 6.12.17 Kernel Configuration`
+comment reflects the version they were captured from; `make olddefconfig`
+upgrades them transparently when building against a newer kernel
+(e.g., 7.0.x).  Copy to the kernel source tree as `.config` instead of
+running `menuconfig` manually.
 
 | File | Description |
 |------|-------------|
@@ -243,7 +275,7 @@ tree as `.config` instead of running `menuconfig` manually.
 **Usage:**
 ```bash
 cp /path/to/em68030-guest-linux/configs/.config.20260312_FB_SIMPLE \
-   /path/to/linux-6.12.17/.config
+   /path/to/linux-${KERNEL_VERSION}/.config
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- olddefconfig
 make ARCH=m68k CROSS_COMPILE=m68k-linux-gnu- vmlinux -j$(nproc)
 ```

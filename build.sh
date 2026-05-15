@@ -2,7 +2,12 @@
 # Build Linux kernel and modules for Em68030 emulator using Docker.
 #
 # Usage:
-#   ./build.sh
+#   ./build.sh [--kernel-version VER]
+#
+# If --kernel-version is omitted, KERNEL_VERSION env is used; otherwise it
+# defaults to "6.12.17" (the version current CI artifacts are built against).
+# Examples: 6.12.17, 7.0.6.  The major component (6 / 7) selects both the
+# kernel.org URL path (vN.x/) and the patches/linux-<major>/ subdirectory.
 #
 # Output:
 #   output/vmlinux-*       - kernel image (load via File > Open ELF in the emulator)
@@ -15,7 +20,34 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOCKER_IMAGE="em68030-linux-builder"
 OUTPUT_DIR="${SCRIPT_DIR}/output"
 
+KERNEL_VERSION="${KERNEL_VERSION:-6.12.17}"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --kernel-version)
+            KERNEL_VERSION="$2"
+            shift 2
+            ;;
+        --kernel-version=*)
+            KERNEL_VERSION="${1#--kernel-version=}"
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--kernel-version VER]"
+            echo ""
+            echo "  --kernel-version VER   Linux version (default: 6.12.17)."
+            echo "                         Examples: 6.12.17, 7.0.6."
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
 echo "=== Em68030 Linux Kernel Builder ==="
+echo "Kernel: ${KERNEL_VERSION}"
+echo ""
 
 # Build Docker image
 echo "--- Building Docker image ---"
@@ -32,6 +64,7 @@ docker run --rm \
     -v "${SCRIPT_DIR}/configs:/build/configs:ro" \
     -v "${SCRIPT_DIR}/docker:/build/docker:ro" \
     -v "${OUTPUT_DIR}:/build/output" \
+    -e KERNEL_VERSION="${KERNEL_VERSION}" \
     "${DOCKER_IMAGE}" \
     bash /build/docker/build-inner.sh
 
